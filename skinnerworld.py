@@ -8,12 +8,11 @@ import time
 
 
 class Cell(object):
-    def __init__(self, x, y, actions, reward=0, absorbing=False, changeagent=False):
+    def __init__(self, x, y, actions, reward=0, changeagent=False):
         self.x = x
         self.y = y
         self.actions = actions
         self.reward = reward
-        self.absorbing = absorbing
         self.changeagent = changeagent
         self.q = dict()
         for action in actions:
@@ -22,9 +21,16 @@ class Cell(object):
         self.n = dict()
         for action in actions:
             self.n[action] = 0
-        self.r = dict()
+        self.total_g = dict()
         for action in actions:
-            self.r[action] = []
+            self.total_g[action] = []
+        self.episode_g = None
+        self.reset_episode_g(actions)
+
+    def reset_episode_g(self, actions):
+        self.episode_g = dict()
+        for action in actions:
+            self.episode_g[action] = 0
 
 
 class StateGrid(object):
@@ -47,7 +53,7 @@ class StateGrid(object):
         self.cell21 = Cell(160, 260, ['right', 'left', 'up', 'down'], reward=-20, changeagent=True)
         self.cell22 = Cell(260, 260, ['right', 'left', 'up', 'down'])
         self.cell23 = Cell(360, 260, ['right', 'left', 'up', 'down'])
-        self.cell24 = Cell(460, 260, actions=[], reward=10, absorbing=True)
+        self.cell24 = Cell(460, 260, actions=['left', 'up', 'down'])
         self.cell30 = Cell(60, 360, ['right', 'up', 'down'])
         self.cell31 = Cell(160, 360, ['right', 'left', 'up', 'down'])
         self.cell32 = Cell(260, 360, ['right', 'left', 'up', 'lever'])
@@ -92,6 +98,7 @@ class Canvas(tk.Frame):
         self.episode_int = tk.IntVar()
         self.step_int = tk.IntVar()
         self.sleep_var = tk.StringVar()
+        self.epsilon_var = tk.StringVar()
         # sets up grid locations and actions
         self.grid = StateGrid()
         self.create_images()
@@ -121,7 +128,6 @@ class Canvas(tk.Frame):
         # bottom side line
         self.canvas.create_line(10, h, w, h)
 
-
     def setup_canvas_items(self):
         # reward label and int to display
         reward_label = self.canvas.create_text(50, 540)
@@ -146,12 +152,17 @@ class Canvas(tk.Frame):
         step_box = tk.Entry(textvariable=str(self.step_int), justify="center", width=10)
         self.canvas.create_window(290, 570, window=step_box)
         # self.canvas.create_text(520, 520, text=self.reward, font="Verdana 10 bold")
-        sleep_label = self.canvas.create_text(550, 40)
+        sleep_label = self.canvas.create_text(550, 30)
         self.canvas.itemconfig(sleep_label, text='Speed: ')
         sleep_entry = tk.Entry(textvariable=self.sleep_var, justify="center", width=10)
-        self.canvas.create_window(600, 40, window=sleep_entry)
-        #episode_limit_label = self.canvas.create_text(550, 60)
-        #self.canvas.itemconfig(episode_limit_label, text = '# Episodes: ')
+        self.canvas.create_window(600, 30, window=sleep_entry)
+
+        epsilon_label = self.canvas.create_text(549, 60)
+        self.canvas.itemconfig(epsilon_label, text='Epsilon: ')
+        epsilon_entry = tk.Entry(textvariable=self.epsilon_var, justify="center", width=10)
+        self.canvas.create_window(600, 60, window=epsilon_entry)
+        # episode_limit_label = self.canvas.create_text(550, 60)
+        # self.canvas.itemconfig(episode_limit_label, text = '# Episodes: ')
 
 
 class GridWorld(Canvas):
@@ -160,13 +171,29 @@ class GridWorld(Canvas):
         super().__init__(master)
         # buttons
         # step button
-        self.button = tk.Button(text="Step", command=lambda: self.random_move_agent())
+        label_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=50)
+        label = tk.Label(label_frame, text="Sample Average Q", background='white')
+        label.pack(padx=0, pady=5)
+        self.button = tk.Button(label_frame, text="One Episode",
+                                command=lambda: self.sample_average_q_control(episodes=self.episode + 1))
         self.button.configure(width=10, activebackground="#33B5E5")
-        self.canvas.create_window(600, 100, window=self.button)
-        # run button
-        self.run_button = tk.Button(text="Run", command=lambda: self.random_move_agent(stop=100))
+        self.button.pack(padx=5, pady=5)
+        self.run_button = tk.Button(label_frame, text="Run", command=lambda: self.sample_average_q_control(episodes=15))
         self.run_button.configure(width=10, activebackground="#33B5E5")
-        self.canvas.create_window(600, 140, window=self.run_button)
+        self.run_button.pack(padx=5, pady=5)
+        self.canvas.create_window(600, 140, window=label_frame, anchor='center')
+
+        mc_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=100)
+        mc_label = tk.Label(mc_frame, text="Monte Carlo", background='white')
+        mc_label.pack(padx=16, pady=5)
+        self.button_mc = tk.Button(mc_frame, text="One Episode",
+                                   command=lambda: self.monte_carlo_control(episodes=self.episode + 1))
+        self.button_mc.configure(width=10, activebackground="#33B5E5")
+        self.button_mc.pack(padx=5, pady=5)
+        self.run_button_mc = tk.Button(mc_frame, text="Run", command=lambda: self.monte_carlo_control(episodes=15))
+        self.run_button_mc.configure(width=10, activebackground="#33B5E5")
+        self.run_button_mc.pack(padx=5, pady=5)
+        self.canvas.create_window(600, 260, window=mc_frame, anchor='center')
 
         self.master.bind('<KeyPress>', self.human_move_agent)
         self.reward = 0
@@ -187,23 +214,36 @@ class GridWorld(Canvas):
         self.n_table = dict()
         for cell in self.grid.grid:
             self.n_table[cell.x, cell.y] = cell.n
-        self.returns_sum = dict()
+        self.episode_g = dict()
         for cell in self.grid.grid:
-            self.returns_sum[cell.x, cell.y] = cell.r
+            self.episode_g[cell.x, cell.y] = cell.episode_g
+        self.total_g = dict()
+        for cell in self.grid.grid:
+            self.total_g[cell.x, cell.y] = cell.total_g
         self.episode_policy = []
         self.reward_list = []
+        self.episode_end = False
 
     def setup_agent(self, sleep):
-        self.canvas.move(self.agent, -400, -200)
+        self.episode_end = False
+        self.canvas.delete('agent')
+        self.agent = self.canvas.create_image(60, 60, image=self.rat_image, tag='agent')
         self.master.update()
         time.sleep(sleep)
         self.agent_state = self.grid.grid[0]
-        self.reward = 0
         self.episode_reward = 0
         self.lever_state = []
+        self.reward_list = []
+        self.episode_policy = []
+        for cell in self.grid.grid:
+            cell.reset_episode_g(cell.actions)
+            self.episode_g[cell.x, cell.y] = cell.episode_g
+        self.reward = 0
         self.reward_int.set(self.reward)
         self.episode = self.episode + 1
         self.episode_int.set(self.episode)
+        self.step = 1
+        self.step_int.set(self.step)
 
     def increase_reward(self):
         self.episode_reward = self.episode_reward + self.reward
@@ -212,15 +252,16 @@ class GridWorld(Canvas):
         self.total_reward_int.set(self.total_reward)
         self.reward_list.append(self.reward)
 
-
     def increase_step(self, sleep, action):
+        memory = {(self.previous_state.x, self.previous_state.y): action}
+        self.episode_policy.append(dict(memory))
         self.step = self.step + 1
         self.step_int.set(self.step)
         self.master.update()
         time.sleep(sleep)
-        state = self.previous_state.x, self.previous_state.y
-        N = self.n_table[state][action] + 1
-        self.n_table[state].update({action: N})
+        previous_state = self.previous_state.x, self.previous_state.y
+        N = self.n_table[previous_state][action] + 1
+        self.n_table[previous_state].update({action: N})
 
     def lever_press_image_flip(self, sleep):
         self.canvas.delete('lever')
@@ -231,8 +272,8 @@ class GridWorld(Canvas):
         self.canvas.create_image(260, 460, image=self.lever_image, tag='lever')
 
     def lever_press(self, sleep):
-        print(len(self.lever_state))
         self.previous_state = self.agent_state
+        self.increase_step(sleep, action='lever')
         if len(self.lever_state) == 3:
             self.lever_press_image_flip(sleep)
             self.canvas.create_rectangle(210, 410, 310, 510, fill='white')
@@ -243,15 +284,13 @@ class GridWorld(Canvas):
             time.sleep(sleep)
             self.canvas.delete('cheese')
             self.increase_reward()
-            self.lever_state = []
-
+            self.episode_end = True
         else:
             self.lever_state.append(1)
             self.reward_list.append(0)
             if len(self.lever_state) == 3:
                 self.canvas.create_rectangle(210, 410, 310, 510, fill='yellow')
             self.lever_press_image_flip(sleep)
-        self.increase_step(sleep, action='lever')
 
     def change_agent_image(self, sleep):
         if self.agent_state.changeagent:
@@ -266,6 +305,7 @@ class GridWorld(Canvas):
 
     def move_action(self, action, sleep):
         self.previous_state = self.agent_state
+        self.increase_step(sleep, action=action)
         if action == 'right':
             self.canvas.move(self.agent, 100, 0)
         elif action == 'left':
@@ -282,31 +322,27 @@ class GridWorld(Canvas):
         self.change_agent_image(sleep)
         self.reward = self.agent_state.reward
         self.increase_reward()
-        self.increase_step(sleep, action=action)
-        if self.agent_state.absorbing:
-            self.setup_agent(sleep)
-
-    def agent_memory(self, action):
-        memory = {(self.previous_state.x, self.previous_state.y): action}
-        self.episode_policy.append(dict(memory))
 
     def human_move_agent(self, event, sleep=0.3):
-        if event.keysym == "space":
-            action_selected = 'lever'
-        elif event.keysym == "Up":
-            action_selected = 'up'
-        elif event.keysym == "Down":
-            action_selected = 'down'
-        elif event.keysym == "Left":
-            action_selected = 'left'
-        else:
-            action_selected = 'right'
-        if action_selected == 'lever':
+        if event.keysym == "Escape":
+            self.episode_end = True
+            self.monte_carlo_prediction()
+            self.setup_agent(sleep)
+        elif event.keysym == "space":
             self.lever_press(sleep)
         else:
-            self.move_action(action=action_selected, sleep=sleep)
-        self.agent_memory(action=action_selected)
-        self.sample_average_q(action_selected)
+            while True:
+                if event.keysym == "Up":
+                    action_selected = 'up'
+                elif event.keysym == "Down":
+                    action_selected = 'down'
+                elif event.keysym == "Left":
+                    action_selected = 'left'
+                elif event.keysym == "Right":
+                    action_selected = 'right'
+                else:
+                    break
+                self.move_action(action=action_selected, sleep=sleep)
 
     def sample_average_q(self, action):
         R = self.reward
@@ -316,26 +352,63 @@ class GridWorld(Canvas):
         Q = Q + ((1 / N) * (R - Q))
         self.q_table[state].update({action: Q})
 
-    def monte_carlo_prediction(self, gamma=0.5):
+    def monte_carlo_prediction(self, gamma=1):
+        value_holder = set()
         for i in range(0, len(self.episode_policy)):
             for key, value in self.episode_policy[i].items():
                 state = key
                 action = value
-                G = 0
-                t = 0
-                for j in range(i, len(walk.reward_list)):
-                    print(t)
-                    G = G + (gamma ** t) * (walk.reward_list[j])
-                    t = t + 1
-                self.returns_sum[state][action].append(G)
+                tup = (state, action)
+                if tup not in value_holder:
+                    value_holder.add(tup)
+                    G = 0
+                    t = 0
+                    for j in range(i, len(walk.reward_list)):
+                        G = G + (gamma ** t) * (walk.reward_list[j])
+                        t = t + 1
+                    self.episode_g[state][action] = G
+                    self.total_g[state][action].append(G)
 
-    def random_move_agent(self, stop=1):
+        for i in range(0, len(self.episode_policy)):
+            for key, value in self.episode_policy[i].items():
+                state = key
+                action = value
+                returns = self.total_g[state][action]
+                self.q_table[state][action] = np.mean(returns)
+
+    def monte_carlo_control(self, episodes):
         if len(self.sleep_var.get()) > 0:
             sleep = float(self.sleep_var.get())
         else:
             sleep = 0.3
-        t = 0
-        while t < stop:
+        if len(self.epsilon_var.get()) > 0:
+            e = float(self.epsilon_var.get())
+        else:
+            e = 0.01
+        while self.episode < episodes:
+            current_state = self.agent_state.x, self.agent_state.y
+            ex = np.random.choice(['exploit', 'explore'], p=[1 - e, e])
+            if ex == 'exploit':
+                max_action = max(self.q_table[current_state].values())
+                action_selected = np.random.choice([k for (k, v) in self.q_table[current_state].items()
+                                                    if v == max_action])
+            else:
+                actions = self.agent_state.actions
+                action_selected = np.random.choice(actions)
+            if action_selected == 'lever':
+                self.lever_press(sleep=sleep)
+                if self.episode_end:
+                    self.monte_carlo_prediction()
+                    self.setup_agent(sleep)
+            else:
+                self.move_action(action=action_selected, sleep=sleep)
+
+    def sample_average_q_control(self, episodes):
+        if len(self.sleep_var.get()) > 0:
+            sleep = float(self.sleep_var.get())
+        else:
+            sleep = 0.3
+        while self.episode < episodes:
             current_state = self.agent_state.x, self.agent_state.y
             e = 0.01
             ex = np.random.choice(['exploit', 'explore'], p=[1 - e, e])
@@ -350,15 +423,9 @@ class GridWorld(Canvas):
                 self.lever_press(sleep=sleep)
             else:
                 self.move_action(action=action_selected, sleep=sleep)
-            self.agent_memory(action=action_selected)
             self.sample_average_q(action_selected)
-            t = t + 1
-
 
 
 app = tk.Tk()
 walk = GridWorld(app)
 walk.mainloop()
-
-
-
