@@ -6,7 +6,7 @@ import time
 from collections.abc import Mapping
 import time
 import pandas as pd
-print('t')
+
 
 class Cell(object):
     def __init__(self, x, y, actions, reward=0, changeagent=False):
