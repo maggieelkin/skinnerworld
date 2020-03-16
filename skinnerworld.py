@@ -5,6 +5,7 @@ import random
 import time
 from collections.abc import Mapping
 import time
+import pandas as pd
 
 
 class Cell(object):
@@ -77,7 +78,7 @@ class Canvas(tk.Frame):
     def __init__(self, master):
         self.master = master
         tk.Frame.__init__(self, master)
-        self.canvas = tk.Canvas(bg='white', height=600, width=700)
+        self.canvas = tk.Canvas(bg='white', height=600, width=770)
         rat_file = Image.open('images/rat.png')
         self.rat_image = ImageTk.PhotoImage(rat_file)
         shock_file = Image.open('images/shock.png')
@@ -99,6 +100,8 @@ class Canvas(tk.Frame):
         self.step_int = tk.IntVar()
         self.sleep_var = tk.StringVar()
         self.epsilon_var = tk.StringVar()
+        self.gamma_var = tk.StringVar()
+        self.alpha_var = tk.StringVar()
         # sets up grid locations and actions
         self.grid = StateGrid()
         self.create_images()
@@ -114,6 +117,7 @@ class Canvas(tk.Frame):
         self.canvas.create_image(260, 460, image=self.lever_image, tag='lever')
         # self.canvas.create_image(460, 260, image=self.cheese_image)
         # self.canvas.create_rectangle(410, 210, 510, 310, fill='light green')
+
         self.agent = self.canvas.create_image(60, 60, image=self.rat_image, tag='agent')
 
     def setup_grid(self, w=510, h=510):
@@ -151,7 +155,7 @@ class Canvas(tk.Frame):
         self.canvas.itemconfig(step_label, text='Step: ')
         step_box = tk.Entry(textvariable=str(self.step_int), justify="center", width=10)
         self.canvas.create_window(290, 570, window=step_box)
-        # self.canvas.create_text(520, 520, text=self.reward, font="Verdana 10 bold")
+
         sleep_label = self.canvas.create_text(550, 30)
         self.canvas.itemconfig(sleep_label, text='Speed: ')
         sleep_entry = tk.Entry(textvariable=self.sleep_var, justify="center", width=10)
@@ -161,14 +165,29 @@ class Canvas(tk.Frame):
         self.canvas.itemconfig(epsilon_label, text='Epsilon: ')
         epsilon_entry = tk.Entry(textvariable=self.epsilon_var, justify="center", width=10)
         self.canvas.create_window(600, 60, window=epsilon_entry)
+
+        gamma_label = self.canvas.create_text(660, 30)
+        self.canvas.itemconfig(gamma_label, text='Gamma: ')
+        gamma_entry = tk.Entry(textvariable=self.gamma_var, justify='center', width=10)
+        self.canvas.create_window(715, 30, window=gamma_entry)
+
+        alpha_label = self.canvas.create_text(660, 60)
+        self.canvas.itemconfig(alpha_label, text='Alpha: ')
+        alpha_entry = tk.Entry(textvariable=self.alpha_var, justify='center',width=10)
+        self.canvas.create_window(715, 60, window=alpha_entry)
+
         # episode_limit_label = self.canvas.create_text(550, 60)
         # self.canvas.itemconfig(episode_limit_label, text = '# Episodes: ')
+
+
 
 
 class GridWorld(Canvas):
 
     def __init__(self, master):
         super().__init__(master)
+
+        self.master.bind('<KeyPress>', self.human_move_agent)
         # buttons
         # step button
         label_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=50)
@@ -181,7 +200,7 @@ class GridWorld(Canvas):
         self.run_button = tk.Button(label_frame, text="Run", command=lambda: self.sample_average_q_control(episodes=15))
         self.run_button.configure(width=10, activebackground="#33B5E5")
         self.run_button.pack(padx=5, pady=5)
-        self.canvas.create_window(600, 140, window=label_frame, anchor='center')
+        self.canvas.create_window(650, 170, window=label_frame, anchor='center')
 
         mc_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=100)
         mc_label = tk.Label(mc_frame, text="Monte Carlo", background='white')
@@ -193,9 +212,40 @@ class GridWorld(Canvas):
         self.run_button_mc = tk.Button(mc_frame, text="Run", command=lambda: self.monte_carlo_control(episodes=15))
         self.run_button_mc.configure(width=10, activebackground="#33B5E5")
         self.run_button_mc.pack(padx=5, pady=5)
-        self.canvas.create_window(600, 260, window=mc_frame, anchor='center')
+        self.canvas.create_window(650, 290, window=mc_frame, anchor='center')
 
-        self.master.bind('<KeyPress>', self.human_move_agent)
+        q_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=100)
+        q_label = tk.Label(q_frame, text="Q Learning", background='white')
+        q_label.pack(padx=20, pady=5)
+        self.button_q = tk.Button(q_frame, text="One Episode",
+                                  command=lambda: self.q_learning_control(episodes=self.episode + 1))
+        self.button_q.configure(width=10, activebackground="#33B5E5")
+        self.button_q.pack(padx=5, pady=5)
+        self.run_button_q = tk.Button(q_frame, text="Run", command=lambda: self.q_learning_control(episodes=15))
+        self.run_button_q.configure(width=10, activebackground="#33B5E5")
+        self.run_button_q.pack(padx=5, pady=5)
+        self.canvas.create_window(650, 410, window=q_frame, anchor='center')
+
+        sarsa_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=100)
+        sarsa_label = tk.Label(sarsa_frame, text="SARSA", background='white')
+        sarsa_label.pack(padx=32, pady=5)
+        self.button_sarsa = tk.Button(sarsa_frame, text="One Episode",
+                                      command=lambda: self.sarsa_control(episodes=self.episode + 1))
+        self.button_sarsa.configure(width=10, activebackground="#33B5E5")
+        self.button_sarsa.pack(padx=5, pady=5)
+        self.run_button_sarsa = tk.Button(sarsa_frame, text="Run", command=lambda: self.sarsa_control(episodes=15))
+        self.run_button_sarsa.configure(width=10, activebackground="#33B5E5")
+        self.run_button_sarsa.pack(padx=5, pady=5)
+        self.canvas.create_window(650, 530, window=sarsa_frame, anchor='center')
+
+        self.q_value_button = tk.Button(text="Show Q Values", command=lambda: self.show_q_values())
+        self.q_value_button.configure(width=10, activebackground="#33B5E5")
+        self.canvas.create_window(390, 540, window=self.q_value_button)
+
+        self.hide_q_value_button = tk.Button(text="Hide Q Values", command=lambda: self.hide_q_values())
+        self.hide_q_value_button.configure(width=10, activebackground="#33B5E5")
+        self.canvas.create_window(390, 570, window=self.hide_q_value_button)
+
         self.reward = 0
         self.total_reward = 0
         self.total_reward_int.set(self.total_reward)
@@ -223,6 +273,68 @@ class GridWorld(Canvas):
         self.episode_policy = []
         self.reward_list = []
         self.episode_end = False
+
+    def initialize_gridworld(self):
+        self.reward = 0
+        self.total_reward = 0
+        self.total_reward_int.set(self.total_reward)
+        self.episode_reward = 0
+        self.reward_int.set(self.episode_reward)
+        self.episode = 1
+        self.episode_int.set(self.episode)
+        self.step = 1
+        self.step_int.set(self.step)
+        self.lever_state = []
+        self.agent_state = self.grid.grid[0]
+        self.previous_state = None
+        self.q_table = dict()
+        for cell in self.grid.grid:
+            self.q_table[cell.x, cell.y] = cell.q
+        self.n_table = dict()
+        for cell in self.grid.grid:
+            self.n_table[cell.x, cell.y] = cell.n
+        self.episode_g = dict()
+        for cell in self.grid.grid:
+            self.episode_g[cell.x, cell.y] = cell.episode_g
+        self.total_g = dict()
+        for cell in self.grid.grid:
+            self.total_g[cell.x, cell.y] = cell.total_g
+        self.episode_policy = []
+        self.reward_list = []
+        self.episode_end = False
+
+    def show_q_values(self):
+        self.canvas.delete('q')
+        for cell in walk.grid.grid:
+            for action in cell.actions:
+                if action == 'right':
+                    x_coord = cell.x + 30
+                    y_coord = cell.y
+                elif action == 'left':
+                    x_coord = cell.x - 30
+                    y_coord = cell.y
+                elif action == 'up':
+                    x_coord = cell.x
+                    y_coord = cell.y - 30
+                elif action == 'down':
+                    x_coord = cell.x
+                    y_coord = cell.y + 30
+                else:
+                    break
+                self.canvas.create_text(x_coord, y_coord, text=np.round(self.q_table[(cell.x, cell.y)][action], 2),
+                                        font="Verdana 8", tag='q')
+        # square 160,460 lever q
+        self.canvas.create_text(190, 460, text=np.round(self.q_table[(160, 460)]['lever'], 2), font="Verdana 8",
+                                tag='q', fill='green')
+        # square 260, 360 lever q
+        self.canvas.create_text(260, 390, text=np.round(self.q_table[(260, 360)]['lever'], 2), font="Verdana 8",
+                                tag='q', fill='green')
+        # square 360, 460 lever q
+        self.canvas.create_text(330, 460, text=np.round(self.q_table[(360, 460)]['lever'], 2), font="Verdana 8",
+                                tag='q', fill='green')
+
+    def hide_q_values(self):
+        self.canvas.delete('q')
 
     def setup_agent(self, sleep):
         self.episode_end = False
@@ -343,6 +455,7 @@ class GridWorld(Canvas):
                 else:
                     break
                 self.move_action(action=action_selected, sleep=sleep)
+                break
 
     def sample_average_q(self, action):
         R = self.reward
@@ -352,29 +465,36 @@ class GridWorld(Canvas):
         Q = Q + ((1 / N) * (R - Q))
         self.q_table[state].update({action: Q})
 
-    def monte_carlo_prediction(self, gamma=1):
+    def q_learning_control(self, episodes):
+        pass
+
+    def sarsa_control(self, episodes):
+        pass
+
+    def monte_carlo_prediction(self):
+        if len(self.gamma_var.get()) > 0:
+            gamma = float(self.gamma_var.get())
+        else:
+            gamma = 0.5
         value_holder = set()
         for i in range(0, len(self.episode_policy)):
             for key, value in self.episode_policy[i].items():
                 state = key
                 action = value
                 tup = (state, action)
-                if tup not in value_holder:
+                if tup in value_holder:
+                    break
+                else:
                     value_holder.add(tup)
                     G = 0
                     t = 0
-                    for j in range(i, len(walk.reward_list)):
-                        G = G + (gamma ** t) * (walk.reward_list[j])
+                    for j in range(i, len(self.reward_list)):
+                        G = G + (gamma ** t) * (self.reward_list[j])
                         t = t + 1
                     self.episode_g[state][action] = G
                     self.total_g[state][action].append(G)
-
-        for i in range(0, len(self.episode_policy)):
-            for key, value in self.episode_policy[i].items():
-                state = key
-                action = value
-                returns = self.total_g[state][action]
-                self.q_table[state][action] = np.mean(returns)
+                    returns = self.total_g[state][action]
+                    self.q_table[state][action] = np.mean(returns)
 
     def monte_carlo_control(self, episodes):
         if len(self.sleep_var.get()) > 0:
@@ -421,9 +541,32 @@ class GridWorld(Canvas):
                 action_selected = np.random.choice(actions)
             if action_selected == 'lever':
                 self.lever_press(sleep=sleep)
+                if self.episode_end:
+                    self.sample_average_q(action_selected)
+                    self.setup_agent(sleep=sleep)
             else:
                 self.move_action(action=action_selected, sleep=sleep)
-            self.sample_average_q(action_selected)
+                self.sample_average_q(action_selected)
+
+
+def show_tkinter_q_table(grid):
+    q = grid.q_table
+    df = pd.DataFrame(q)
+    df = df.reset_index()
+    # %%
+    root = tk.Tk()
+    i = 0
+    c = 0
+    for x in df.columns.to_list():
+        tk.Label(root, text=x).grid(row=i, column=c)
+        c = c + 1
+
+    for i, row in df.iterrows():
+        c = 0
+        for cell in row:
+            tk.Label(root, text=cell).grid(row=i + 1, column=c)
+            c = c + 1
+    root.mainloop()
 
 
 app = tk.Tk()
