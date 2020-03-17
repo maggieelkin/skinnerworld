@@ -1,7 +1,7 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
-import random
+from random import randint
 import time
 from collections.abc import Mapping
 import time
@@ -60,7 +60,7 @@ class StateGrid(object):
         self.cell32 = Cell(260, 360, ['right', 'left', 'up', 'lever'])
         self.cell33 = Cell(360, 360, ['right', 'left', 'up', 'down'])
         self.cell34 = Cell(460, 360, ['left', 'up', 'down'])
-        self.cell40 = Cell(60, 460, ['right', 'up'], reward=-10, changeagent=True)
+        self.cell40 = Cell(60, 460, ['right', 'up'], reward=-20, changeagent=True)
         self.cell41 = Cell(160, 460, ['left', 'up', 'lever'])
         self.cell42 = Cell(260, 460, [])
         self.cell43 = Cell(360, 460, ['right', 'up', 'lever'])
@@ -102,6 +102,10 @@ class Canvas(tk.Frame):
         self.epsilon_var = tk.StringVar()
         self.gamma_var = tk.StringVar()
         self.alpha_var = tk.StringVar()
+
+        self.lever_var = tk.IntVar()
+        self.lever_ratio = tk.StringVar()
+
         # sets up grid locations and actions
         self.grid = StateGrid()
         self.create_images()
@@ -115,9 +119,6 @@ class Canvas(tk.Frame):
         self.canvas.create_image(160, 260, image=self.shock_image)
         self.canvas.create_image(360, 160, image=self.shock_image)
         self.canvas.create_image(260, 460, image=self.lever_image, tag='lever')
-        # self.canvas.create_image(460, 260, image=self.cheese_image)
-        # self.canvas.create_rectangle(410, 210, 510, 310, fill='light green')
-
         self.agent = self.canvas.create_image(60, 60, image=self.rat_image, tag='agent')
 
     def setup_grid(self, w=510, h=510):
@@ -156,30 +157,41 @@ class Canvas(tk.Frame):
         step_box = tk.Entry(textvariable=str(self.step_int), justify="center", width=10)
         self.canvas.create_window(290, 570, window=step_box)
 
-        sleep_label = self.canvas.create_text(550, 30)
+        sleep_label = self.canvas.create_text(550, 20)
         self.canvas.itemconfig(sleep_label, text='Speed: ')
         sleep_entry = tk.Entry(textvariable=self.sleep_var, justify="center", width=10)
-        self.canvas.create_window(600, 30, window=sleep_entry)
+        self.canvas.create_window(600, 20, window=sleep_entry)
 
-        epsilon_label = self.canvas.create_text(549, 60)
+        epsilon_label = self.canvas.create_text(549, 50)
         self.canvas.itemconfig(epsilon_label, text='Epsilon: ')
         epsilon_entry = tk.Entry(textvariable=self.epsilon_var, justify="center", width=10)
-        self.canvas.create_window(600, 60, window=epsilon_entry)
+        self.canvas.create_window(600, 50, window=epsilon_entry)
 
-        gamma_label = self.canvas.create_text(660, 30)
+        gamma_label = self.canvas.create_text(660, 20)
         self.canvas.itemconfig(gamma_label, text='Gamma: ')
         gamma_entry = tk.Entry(textvariable=self.gamma_var, justify='center', width=10)
-        self.canvas.create_window(715, 30, window=gamma_entry)
+        self.canvas.create_window(715, 20, window=gamma_entry)
 
-        alpha_label = self.canvas.create_text(660, 60)
+        alpha_label = self.canvas.create_text(660, 50)
         self.canvas.itemconfig(alpha_label, text='Alpha: ')
-        alpha_entry = tk.Entry(textvariable=self.alpha_var, justify='center',width=10)
-        self.canvas.create_window(715, 60, window=alpha_entry)
+        alpha_entry = tk.Entry(textvariable=self.alpha_var, justify='center', width=10)
+        self.canvas.create_window(715, 50, window=alpha_entry)
+
+        lever_frame = tk.LabelFrame(self.canvas, text='Schedule of Reinforcement', background='white', pady=5)
+        tk.Radiobutton(lever_frame, text="Variable", variable=self.lever_var, background='white', value=1,
+                       command=lambda: self.set_lever_schedule()).grid(
+            column=1, row=1)
+        tk.Radiobutton(lever_frame, text="Ratio", variable=self.lever_var, background='white', value=2,
+                       command=lambda: self.set_lever_schedule()).grid(column=2,
+                                                                       row=1)
+        ratio_label = tk.Label(lever_frame, text="Ratio: ", background='white')
+        ratio_label.grid(column=1, row=2)
+        ratio_entry = tk.Entry(lever_frame, textvariable=self.lever_ratio, width=10)
+        ratio_entry.grid(column=2, row=2)
+        self.canvas.create_window(650, 100, window=lever_frame, anchor='center')
 
         # episode_limit_label = self.canvas.create_text(550, 60)
         # self.canvas.itemconfig(episode_limit_label, text = '# Episodes: ')
-
-
 
 
 class GridWorld(Canvas):
@@ -190,9 +202,9 @@ class GridWorld(Canvas):
         self.master.bind('<KeyPress>', self.human_move_agent)
         # buttons
         # step button
-        label_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=50)
+        label_frame = tk.LabelFrame(self.canvas, background='white')
         label = tk.Label(label_frame, text="Sample Average Q", background='white')
-        label.pack(padx=0, pady=5)
+        label.pack(padx=0, pady=1)
         self.button = tk.Button(label_frame, text="One Episode",
                                 command=lambda: self.sample_average_q_control(episodes=self.episode + 1))
         self.button.configure(width=10, activebackground="#33B5E5")
@@ -200,11 +212,11 @@ class GridWorld(Canvas):
         self.run_button = tk.Button(label_frame, text="Run", command=lambda: self.sample_average_q_control(episodes=15))
         self.run_button.configure(width=10, activebackground="#33B5E5")
         self.run_button.pack(padx=5, pady=5)
-        self.canvas.create_window(650, 170, window=label_frame, anchor='center')
+        self.canvas.create_window(650, 190, window=label_frame, anchor='center')
 
-        mc_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=100)
+        mc_frame = tk.LabelFrame(self.canvas, background='white')
         mc_label = tk.Label(mc_frame, text="Monte Carlo", background='white')
-        mc_label.pack(padx=16, pady=5)
+        mc_label.pack(padx=16, pady=1)
         self.button_mc = tk.Button(mc_frame, text="One Episode",
                                    command=lambda: self.monte_carlo_control(episodes=self.episode + 1))
         self.button_mc.configure(width=10, activebackground="#33B5E5")
@@ -214,9 +226,9 @@ class GridWorld(Canvas):
         self.run_button_mc.pack(padx=5, pady=5)
         self.canvas.create_window(650, 290, window=mc_frame, anchor='center')
 
-        q_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=100)
+        q_frame = tk.LabelFrame(self.canvas, background='white')
         q_label = tk.Label(q_frame, text="Q Learning", background='white')
-        q_label.pack(padx=20, pady=5)
+        q_label.pack(padx=20, pady=1)
         self.button_q = tk.Button(q_frame, text="One Episode",
                                   command=lambda: self.q_learning_control(episodes=self.episode + 1))
         self.button_q.configure(width=10, activebackground="#33B5E5")
@@ -224,11 +236,11 @@ class GridWorld(Canvas):
         self.run_button_q = tk.Button(q_frame, text="Run", command=lambda: self.q_learning_control(episodes=15))
         self.run_button_q.configure(width=10, activebackground="#33B5E5")
         self.run_button_q.pack(padx=5, pady=5)
-        self.canvas.create_window(650, 410, window=q_frame, anchor='center')
+        self.canvas.create_window(650, 390, window=q_frame, anchor='center')
 
-        sarsa_frame = tk.LabelFrame(self.canvas, background='white', height=200, width=100)
+        sarsa_frame = tk.LabelFrame(self.canvas, background='white')
         sarsa_label = tk.Label(sarsa_frame, text="SARSA", background='white')
-        sarsa_label.pack(padx=32, pady=5)
+        sarsa_label.pack(padx=32, pady=1)
         self.button_sarsa = tk.Button(sarsa_frame, text="One Episode",
                                       command=lambda: self.sarsa_control(episodes=self.episode + 1))
         self.button_sarsa.configure(width=10, activebackground="#33B5E5")
@@ -236,7 +248,7 @@ class GridWorld(Canvas):
         self.run_button_sarsa = tk.Button(sarsa_frame, text="Run", command=lambda: self.sarsa_control(episodes=15))
         self.run_button_sarsa.configure(width=10, activebackground="#33B5E5")
         self.run_button_sarsa.pack(padx=5, pady=5)
-        self.canvas.create_window(650, 530, window=sarsa_frame, anchor='center')
+        self.canvas.create_window(650, 490, window=sarsa_frame, anchor='center')
 
         self.q_value_button = tk.Button(text="Show Q Values", command=lambda: self.show_q_values())
         self.q_value_button.configure(width=10, activebackground="#33B5E5")
@@ -248,31 +260,21 @@ class GridWorld(Canvas):
 
         self.reward = 0
         self.total_reward = 0
-        self.total_reward_int.set(self.total_reward)
         self.episode_reward = 0
-        self.reward_int.set(self.episode_reward)
         self.episode = 1
-        self.episode_int.set(self.episode)
         self.step = 1
-        self.step_int.set(self.step)
         self.lever_state = []
         self.agent_state = self.grid.grid[0]
         self.previous_state = None
         self.q_table = dict()
-        for cell in self.grid.grid:
-            self.q_table[cell.x, cell.y] = cell.q
         self.n_table = dict()
-        for cell in self.grid.grid:
-            self.n_table[cell.x, cell.y] = cell.n
         self.episode_g = dict()
-        for cell in self.grid.grid:
-            self.episode_g[cell.x, cell.y] = cell.episode_g
         self.total_g = dict()
-        for cell in self.grid.grid:
-            self.total_g[cell.x, cell.y] = cell.total_g
         self.episode_policy = []
         self.reward_list = []
         self.episode_end = False
+        self.lever_reward_step = None
+        self.initialize_gridworld()
 
     def initialize_gridworld(self):
         self.reward = 0
@@ -287,21 +289,18 @@ class GridWorld(Canvas):
         self.lever_state = []
         self.agent_state = self.grid.grid[0]
         self.previous_state = None
-        self.q_table = dict()
         for cell in self.grid.grid:
             self.q_table[cell.x, cell.y] = cell.q
-        self.n_table = dict()
         for cell in self.grid.grid:
             self.n_table[cell.x, cell.y] = cell.n
-        self.episode_g = dict()
         for cell in self.grid.grid:
             self.episode_g[cell.x, cell.y] = cell.episode_g
-        self.total_g = dict()
         for cell in self.grid.grid:
             self.total_g[cell.x, cell.y] = cell.total_g
         self.episode_policy = []
         self.reward_list = []
         self.episode_end = False
+        self.set_lever_schedule()
 
     def show_q_values(self):
         self.canvas.delete('q')
@@ -336,6 +335,17 @@ class GridWorld(Canvas):
     def hide_q_values(self):
         self.canvas.delete('q')
 
+    def set_lever_schedule(self):
+        if self.lever_var.get() == 1:
+            step = randint(0, 5)
+            self.lever_reward_step = step
+        else:
+            if len(self.lever_ratio.get()) > 0:
+                self.lever_reward_step = int(self.lever_ratio.get())
+            else:
+                self.lever_reward_step = 3
+        print('new step', str(self.lever_reward_step))
+
     def setup_agent(self, sleep):
         self.episode_end = False
         self.canvas.delete('agent')
@@ -345,6 +355,7 @@ class GridWorld(Canvas):
         self.agent_state = self.grid.grid[0]
         self.episode_reward = 0
         self.lever_state = []
+        self.set_lever_schedule()
         self.reward_list = []
         self.episode_policy = []
         for cell in self.grid.grid:
@@ -386,7 +397,7 @@ class GridWorld(Canvas):
     def lever_press(self, sleep):
         self.previous_state = self.agent_state
         self.increase_step(sleep, action='lever')
-        if len(self.lever_state) == 3:
+        if len(self.lever_state) == self.lever_reward_step:
             self.lever_press_image_flip(sleep)
             self.canvas.create_rectangle(210, 410, 310, 510, fill='white')
             self.canvas.create_image(260, 460, image=self.lever_image, tag='lever')
@@ -397,10 +408,11 @@ class GridWorld(Canvas):
             self.canvas.delete('cheese')
             self.increase_reward()
             self.episode_end = True
+
         else:
             self.lever_state.append(1)
             self.reward_list.append(0)
-            if len(self.lever_state) == 3:
+            if len(self.lever_state) == self.lever_reward_step:
                 self.canvas.create_rectangle(210, 410, 310, 510, fill='yellow')
             self.lever_press_image_flip(sleep)
 
@@ -436,6 +448,8 @@ class GridWorld(Canvas):
         self.increase_reward()
 
     def human_move_agent(self, event, sleep=0.3):
+        # if self.step == 1:
+        #    self.set_lever_schedule()
         if event.keysym == "Escape":
             self.episode_end = True
             self.monte_carlo_prediction()
@@ -572,3 +586,4 @@ def show_tkinter_q_table(grid):
 app = tk.Tk()
 walk = GridWorld(app)
 walk.mainloop()
+print(walk.lever_var.get())
