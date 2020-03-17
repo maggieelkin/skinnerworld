@@ -177,6 +177,19 @@ class Canvas(tk.Frame):
         alpha_entry = tk.Entry(textvariable=self.alpha_var, justify='center', width=10)
         self.canvas.create_window(715, 50, window=alpha_entry)
 
+
+
+        # episode_limit_label = self.canvas.create_text(550, 60)
+        # self.canvas.itemconfig(episode_limit_label, text = '# Episodes: ')
+
+
+class GridWorld(Canvas):
+
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.master.bind('<KeyPress>', self.human_move_agent)
+
         lever_frame = tk.LabelFrame(self.canvas, text='Schedule of Reinforcement', background='white', pady=5)
         tk.Radiobutton(lever_frame, text="Variable", variable=self.lever_var, background='white', value=1,
                        command=lambda: self.set_lever_schedule()).grid(
@@ -190,16 +203,7 @@ class Canvas(tk.Frame):
         ratio_entry.grid(column=2, row=2)
         self.canvas.create_window(650, 100, window=lever_frame, anchor='center')
 
-        # episode_limit_label = self.canvas.create_text(550, 60)
-        # self.canvas.itemconfig(episode_limit_label, text = '# Episodes: ')
 
-
-class GridWorld(Canvas):
-
-    def __init__(self, master):
-        super().__init__(master)
-
-        self.master.bind('<KeyPress>', self.human_move_agent)
         # buttons
         # step button
         label_frame = tk.LabelFrame(self.canvas, background='white')
@@ -240,7 +244,7 @@ class GridWorld(Canvas):
 
         sarsa_frame = tk.LabelFrame(self.canvas, background='white')
         sarsa_label = tk.Label(sarsa_frame, text="SARSA", background='white')
-        sarsa_label.pack(padx=32, pady=1)
+        sarsa_label.pack(padx=31, pady=1)
         self.button_sarsa = tk.Button(sarsa_frame, text="One Episode",
                                       command=lambda: self.sarsa_control(episodes=self.episode + 1))
         self.button_sarsa.configure(width=10, activebackground="#33B5E5")
@@ -343,8 +347,8 @@ class GridWorld(Canvas):
             if len(self.lever_ratio.get()) > 0:
                 self.lever_reward_step = int(self.lever_ratio.get())
             else:
-                self.lever_reward_step = 3
-        print('new step', str(self.lever_reward_step))
+                self.lever_reward_step = 0
+
 
     def setup_agent(self, sleep):
         self.episode_end = False
@@ -397,7 +401,7 @@ class GridWorld(Canvas):
     def lever_press(self, sleep):
         self.previous_state = self.agent_state
         self.increase_step(sleep, action='lever')
-        if len(self.lever_state) == self.lever_reward_step:
+        if len(self.lever_state) >= self.lever_reward_step-1:
             self.lever_press_image_flip(sleep)
             self.canvas.create_rectangle(210, 410, 310, 510, fill='white')
             self.canvas.create_image(260, 460, image=self.lever_image, tag='lever')
@@ -412,7 +416,7 @@ class GridWorld(Canvas):
         else:
             self.lever_state.append(1)
             self.reward_list.append(0)
-            if len(self.lever_state) == self.lever_reward_step:
+            if len(self.lever_state) >= self.lever_reward_step-1:
                 self.canvas.create_rectangle(210, 410, 310, 510, fill='yellow')
             self.lever_press_image_flip(sleep)
 
@@ -448,8 +452,7 @@ class GridWorld(Canvas):
         self.increase_reward()
 
     def human_move_agent(self, event, sleep=0.3):
-        # if self.step == 1:
-        #    self.set_lever_schedule()
+        self.set_lever_schedule()
         if event.keysym == "Escape":
             self.episode_end = True
             self.monte_carlo_prediction()
@@ -511,6 +514,7 @@ class GridWorld(Canvas):
                     self.q_table[state][action] = np.mean(returns)
 
     def monte_carlo_control(self, episodes):
+        self.set_lever_schedule()
         if len(self.sleep_var.get()) > 0:
             sleep = float(self.sleep_var.get())
         else:
@@ -538,6 +542,7 @@ class GridWorld(Canvas):
                 self.move_action(action=action_selected, sleep=sleep)
 
     def sample_average_q_control(self, episodes):
+        self.set_lever_schedule()
         if len(self.sleep_var.get()) > 0:
             sleep = float(self.sleep_var.get())
         else:
@@ -586,4 +591,4 @@ def show_tkinter_q_table(grid):
 app = tk.Tk()
 walk = GridWorld(app)
 walk.mainloop()
-print(walk.lever_var.get())
+
