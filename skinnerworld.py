@@ -6,7 +6,7 @@ import time
 from collections.abc import Mapping
 import time
 import pandas as pd
-
+# TODO add function and class definitions to everything
 
 class Cell(object):
     def __init__(self, x, y, actions, reward=0, changeagent=False):
@@ -206,6 +206,7 @@ class GridWorld(Canvas):
 
         # buttons
         # step button
+        # TODO figure out how many episodes should be run and set that as the max episodes or set variable on gui for num episodes
         label_frame = tk.LabelFrame(self.canvas, background='white')
         label = tk.Label(label_frame, text="Sample Average Q", background='white')
         label.pack(padx=0, pady=1)
@@ -218,6 +219,7 @@ class GridWorld(Canvas):
         self.run_button.pack(padx=5, pady=5)
         self.canvas.create_window(650, 190, window=label_frame, anchor='center')
 
+        # TODO make all these frames one frame in one grid, possibly the same grid but with no lines around it?
         mc_frame = tk.LabelFrame(self.canvas, background='white')
         mc_label = tk.Label(mc_frame, text="Monte Carlo", background='white')
         mc_label.pack(padx=16, pady=1)
@@ -254,6 +256,9 @@ class GridWorld(Canvas):
         self.run_button_sarsa.pack(padx=5, pady=5)
         self.canvas.create_window(650, 490, window=sarsa_frame, anchor='center')
 
+
+        # TODO Change these buttons to radio buttons to hide and show q-values and update q-values after each step
+        # TODO add V value hide and change radio buttons
         self.q_value_button = tk.Button(text="Show Q Values", command=lambda: self.show_q_values())
         self.q_value_button.configure(width=10, activebackground="#33B5E5")
         self.canvas.create_window(390, 540, window=self.q_value_button)
@@ -412,7 +417,6 @@ class GridWorld(Canvas):
             self.canvas.delete('cheese')
             self.increase_reward()
             self.episode_end = True
-
         else:
             self.lever_state.append(1)
             self.reward_list.append(0)
@@ -474,18 +478,55 @@ class GridWorld(Canvas):
                 self.move_action(action=action_selected, sleep=sleep)
                 break
 
-    def sample_average_q(self, action):
+    def q_learning_prediction(self, action):
+        # TODO check if this math makes sense
+        # TODO Refractor code to put control functions that are similar to be the same function with different parameters
+        if len(self.gamma_var.get()) > 0:
+            gamma = float(self.gamma_var.get())
+        else:
+            gamma = 0.5
+        if len(self.alpha_var.get()) > 0:
+            alpha = float(self.alpha_var.get())
+        else:
+            alpha = 0.5
         R = self.reward
-        state = self.previous_state.x, self.previous_state.y
-        N = self.n_table[state][action]
-        Q = self.q_table[state][action]
-        Q = Q + ((1 / N) * (R - Q))
-        self.q_table[state].update({action: Q})
+        S = self.previous_state.x, self.previous_state.y
+        A = action
+        Q = self.q_table[S][A]
+        current_state = self.agent_state.x, self.agent_state.y
+        # TODO:What if there is two max Q(S',a) values?
+        max_a = max(self.q_table[current_state].values())
+        new_q = Q + alpha*(R + (gamma * max_a) - Q)
+        self.q_table[S].update({action: new_q})
 
     def q_learning_control(self, episodes):
-        pass
+        self.set_lever_schedule()
+        if len(self.sleep_var.get()) > 0:
+            sleep = float(self.sleep_var.get())
+        else:
+            sleep = 0.3
+        while self.episode < episodes:
+            current_state = self.agent_state.x, self.agent_state.y
+            e = 0.01
+            ex = np.random.choice(['exploit', 'explore'], p=[1 - e, e])
+            if ex == 'exploit':
+                max_action = max(self.q_table[current_state].values())
+                action_selected = np.random.choice([k for (k, v) in self.q_table[current_state].items()
+                                                    if v == max_action])
+            else:
+                actions = self.agent_state.actions
+                action_selected = np.random.choice(actions)
+            if action_selected == 'lever':
+                self.lever_press(sleep=sleep)
+                if self.episode_end:
+                    self.q_learning_prediction(action_selected)
+                    self.setup_agent(sleep=sleep)
+            else:
+                self.move_action(action=action_selected, sleep=sleep)
+                self.q_learning_prediction(action_selected)
 
     def sarsa_control(self, episodes):
+        # TODO code SARSA prediction and SARSA control
         pass
 
     def monte_carlo_prediction(self):
@@ -541,6 +582,14 @@ class GridWorld(Canvas):
             else:
                 self.move_action(action=action_selected, sleep=sleep)
 
+    def sample_average_q(self, action):
+        R = self.reward
+        state = self.previous_state.x, self.previous_state.y
+        N = self.n_table[state][action]
+        Q = self.q_table[state][action]
+        Q = Q + ((1 / N) * (R - Q))
+        self.q_table[state].update({action: Q})
+
     def sample_average_q_control(self, episodes):
         self.set_lever_schedule()
         if len(self.sleep_var.get()) > 0:
@@ -569,17 +618,16 @@ class GridWorld(Canvas):
 
 
 def show_tkinter_q_table(grid):
+    # TODO make a way to save results after running gridworld
     q = grid.q_table
     df = pd.DataFrame(q)
     df = df.reset_index()
-    # %%
     root = tk.Tk()
     i = 0
     c = 0
     for x in df.columns.to_list():
         tk.Label(root, text=x).grid(row=i, column=c)
         c = c + 1
-
     for i, row in df.iterrows():
         c = 0
         for cell in row:
@@ -591,4 +639,3 @@ def show_tkinter_q_table(grid):
 app = tk.Tk()
 walk = GridWorld(app)
 walk.mainloop()
-
