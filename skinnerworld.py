@@ -174,7 +174,6 @@ class GridWorld(Canvas):
         self.canvas.create_image(260, 460, image=self.lever_image, tag='lever')
 
     def lever_press(self, sleep):
-
         self.previous_state = self.agent_state
         self.increase_step(sleep, action='lever')
         if len(self.lever_state) >= self.lever_reward_step - 1:
@@ -293,14 +292,25 @@ class GridWorld(Canvas):
         A = action
         Q = self.q_table[S][A]
         current_state = self.agent_state.x, self.agent_state.y
-        # TODO:What if there is two max Q(S',a) values?
         max_a = max(self.q_table[current_state].values())
         new_q = Q + alpha * (R + (gamma * max_a) - Q)
         self.q_table[S].update({action: new_q})
 
     def sarsa_prediction(self, action):
-        pass
-
+        # TODO how to update the last action (that gets reward) if the next state is terminal?
+        gamma = float(self.gamma_var.get())
+        alpha = float(self.alpha_var.get())
+        if len(self.episode_policy) > 1:
+            for key, value in self.episode_policy[-2].items():
+                S = key
+                A = value
+                R = self.reward_list[-2]
+                Q = self.q_table[S][A]
+                S_prime = self.previous_state.x, self.previous_state.y
+                A_prime = action
+                Q_prime = self.q_table[S_prime][A_prime]
+                new_q = Q + alpha * (R + (gamma * Q_prime) - Q)
+                self.q_table[S].update({A: new_q})
 
 
     def agent_control(self, episodes):
@@ -343,25 +353,7 @@ class GridWorld(Canvas):
 
 
 
-def show_tkinter_q_table(grid):
-    # TODO make a way to save results after running gridworld
-    q = grid.q_table
-    df = pd.DataFrame(q)
-    df = df.reset_index()
-    root = tk.Tk()
-    i = 0
-    c = 0
-    for x in df.columns.to_list():
-        tk.Label(root, text=x).grid(row=i, column=c)
-        c = c + 1
-    for i, row in df.iterrows():
-        c = 0
-        for cell in row:
-            tk.Label(root, text=cell).grid(row=i + 1, column=c)
-            c = c + 1
-    root.mainloop()
-
-
 app = tk.Tk()
 walk = GridWorld(app)
 walk.mainloop()
+
