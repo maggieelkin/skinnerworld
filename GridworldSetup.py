@@ -24,11 +24,18 @@ class Cell(object):
             self.total_g[action] = []
         self.episode_g = None
         self.reset_episode_g(actions)
+        self.episode_e = None
+        self.reset_episode_e(actions)
 
     def reset_episode_g(self, actions):
         self.episode_g = dict()
         for action in actions:
             self.episode_g[action] = 0
+
+    def reset_episode_e(self, actions):
+        self.episode_e = dict()
+        for action in actions:
+            self.episode_e[action] = 0
 
 
 class StateGrid(object):
@@ -114,9 +121,13 @@ class Canvas(tk.Frame):
         self.algorithm_var = tk.IntVar()
         self.algorithm_var.set(1)
 
-        #1 is show, 0 is hide
+        # 1 is show, 0 is hide
         self.show_q_var = tk.IntVar()
         self.show_q_var.set(0)
+
+        # 1 is show, 0 is hide
+        self.show_v_var = tk.IntVar()
+        self.show_v_var.set(0)
 
         # sets up grid locations and actions
         self.grid = StateGrid()

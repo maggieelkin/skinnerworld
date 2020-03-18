@@ -3,6 +3,7 @@ import numpy as np
 from random import randint
 import time
 
+
 class GridWorld(Canvas):
 
     def __init__(self, master):
@@ -16,7 +17,7 @@ class GridWorld(Canvas):
 
         # TODO add V value hide and change radio buttons
         run_frame = tk.LabelFrame(self.canvas, text='Start GridWorld', labelanchor='n', background='white',
-                                    pady=5, padx=5)
+                                  pady=5, padx=5)
         self.button = tk.Button(run_frame, text="One Episode",
                                 command=lambda: self.agent_control(episodes=self.episode + 1))
         self.button.configure(width=10, activebackground="#33B5E5")
@@ -26,12 +27,19 @@ class GridWorld(Canvas):
         self.run_button.configure(width=10, activebackground="#33B5E5")
         self.run_button.grid(row=1, column=2)
 
-        show_q_value_radio = tk.Radiobutton(run_frame, text="Show Q Values", variable=self.show_q_var, background='white',
-                                        value=1, command=lambda: self.show_q_values())
+        show_q_value_radio = tk.Radiobutton(run_frame, text="Show Q Values", variable=self.show_q_var,
+                                            background='white', value=1, command=lambda: self.show_q_values())
         show_q_value_radio.grid(row=2, column=1)
-        hide_q_value_radio = tk.Radiobutton(run_frame, text="Hide Q Values", variable=self.show_q_var, background='white',
-                                        value=0, command=lambda: self.show_q_values())
+        hide_q_value_radio = tk.Radiobutton(run_frame, text="Hide Q Values", variable=self.show_q_var,
+                                            background='white', value=0, command=lambda: self.show_q_values())
         hide_q_value_radio.grid(row=2, column=2)
+
+        show_v_value_radio = tk.Radiobutton(run_frame, text='Show V Values', variable=self.show_v_var,
+                                            background='white', value=1)
+        show_v_value_radio.grid(row=3, column=1)
+        hide_v_value_radio = tk.Radiobutton(run_frame, text='Hide V Values', variable=self.show_v_var,
+                                            background='white', value=0)
+        hide_v_value_radio.grid(row=3, column=2)
         self.canvas.create_window(650, 340, window=run_frame, anchor='center')
 
         self.reward = 0
@@ -44,8 +52,10 @@ class GridWorld(Canvas):
         self.previous_state = None
         self.q_table = dict()
         self.n_table = dict()
+        self.v_table = dict()
         self.episode_g = dict()
         self.total_g = dict()
+        self.episode_e = dict()
         self.episode_policy = []
         self.reward_list = []
         self.episode_end = False
@@ -67,12 +77,11 @@ class GridWorld(Canvas):
         self.previous_state = None
         for cell in self.grid.grid:
             self.q_table[cell.x, cell.y] = cell.q
-        for cell in self.grid.grid:
             self.n_table[cell.x, cell.y] = cell.n
-        for cell in self.grid.grid:
+            self.v_table[cell.x, cell.y] = cell.v
             self.episode_g[cell.x, cell.y] = cell.episode_g
-        for cell in self.grid.grid:
             self.total_g[cell.x, cell.y] = cell.total_g
+            self.episode_e[cell.x, cell.y] = cell.episode_e
         self.episode_policy = []
         self.reward_list = []
         self.episode_end = False
@@ -111,6 +120,26 @@ class GridWorld(Canvas):
         else:
             self.canvas.delete('q')
 
+    def show_v_values(self):
+        if self.show_v_var.get() > 0:
+            self.canvas.delete('v')
+            for cell in self.grid.grid:
+                if self.v_table[cell.x, cell.y] is not None:
+                    self.canvas.create_text(cell.x, cell.y, text=np.round(self.v_table[(cell.x, cell.y)], 2),
+                                        font="Verdana 8", tag='v')
+        else:
+            self.canvas.delete('v')
+
+    def v_values(self):
+        for cell in self.grid.grid:
+            s = cell.x, cell.y
+            if s == (260, 460):
+                v = None
+            else:
+                v = max(walk.q_table[s].values())
+            walk.v_table.update({s: v})
+
+
     def set_lever_schedule(self):
         if len(self.lever_limit.get()) > 0:
             variable = int(round(float(self.lever_limit.get())))
@@ -140,6 +169,8 @@ class GridWorld(Canvas):
         for cell in self.grid.grid:
             cell.reset_episode_g(cell.actions)
             self.episode_g[cell.x, cell.y] = cell.episode_g
+            cell.reset_episode_e(cell.actions)
+            self.episode_e[cell.x, cell.y] = cell.episode_e
         self.reward = 0
         self.reward_int.set(self.reward)
         self.episode = self.episode + 1
@@ -193,7 +224,6 @@ class GridWorld(Canvas):
             if len(self.lever_state) >= self.lever_reward_step - 1:
                 self.canvas.create_rectangle(210, 410, 310, 510, fill='yellow')
             self.lever_press_image_flip(sleep)
-
 
     def change_agent_image(self, sleep):
         if self.agent_state.changeagent:
@@ -284,7 +314,6 @@ class GridWorld(Canvas):
                     self.q_table[state][action] = np.mean(returns)
 
     def q_learning_prediction(self, action):
-        # TODO check if this math makes sense
         gamma = float(self.gamma_var.get())
         alpha = float(self.alpha_var.get())
         R = self.reward
@@ -297,10 +326,20 @@ class GridWorld(Canvas):
         self.q_table[S].update({action: new_q})
 
     def sarsa_prediction(self, action):
-        # TODO how to update the last action (that gets reward) if the next state is terminal?
         gamma = float(self.gamma_var.get())
         alpha = float(self.alpha_var.get())
-        if len(self.episode_policy) > 1:
+        lam = 1
+        if self.episode_end:
+            R = self.reward
+            S = self.previous_state.x, self.previous_state.y
+            A = action
+            Q = self.q_table[S][A]
+            # if episode end then Q(S',A') = 0
+            delta = R - Q
+            E = self.episode_e[S][A]
+            E = E + 1
+            self.episode_e[S].update({A: E})
+        elif len(self.episode_policy) > 1:
             for key, value in self.episode_policy[-2].items():
                 S = key
                 A = value
@@ -309,9 +348,21 @@ class GridWorld(Canvas):
                 S_prime = self.previous_state.x, self.previous_state.y
                 A_prime = action
                 Q_prime = self.q_table[S_prime][A_prime]
-                new_q = Q + alpha * (R + (gamma * Q_prime) - Q)
-                self.q_table[S].update({A: new_q})
-
+                delta = R + (gamma * Q_prime) - Q
+                E = self.episode_e[S][A]
+                E = E + 1
+                self.episode_e[S].update({A: E})
+        else:
+            delta = 0
+        for cell in self.grid.grid:
+            s = cell.x, cell.y
+            for a in cell.actions:
+                q_s_a = self.q_table[s][a]
+                e_s_a = self.episode_e[s][a]
+                q_s_a = q_s_a + (alpha * delta * e_s_a)
+                e_s_a = gamma * lam * e_s_a
+                self.q_table[s].update({a: q_s_a})
+                self.episode_e[s].update({a: e_s_a})
 
     def agent_control(self, episodes):
         algorithm = self.algorithm_var.get()
@@ -349,11 +400,15 @@ class GridWorld(Canvas):
                     self.q_learning_prediction(action_selected)
                 elif algorithm == 4:
                     self.sarsa_prediction(action_selected)
-
-
+        self.v_values()
+        if self.show_v_var.get() > 0:
+            self.show_q_var.set(0)
+            self.show_v_values()
 
 
 app = tk.Tk()
 walk = GridWorld(app)
 walk.mainloop()
 
+#%%
+print(walk.v_table[160,460])
