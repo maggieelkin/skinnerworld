@@ -96,12 +96,14 @@ class Canvas(tk.Frame):
         shock_rat_file = Image.open('images/shock_rat.png')
         self.shock_rat_image = ImageTk.PhotoImage(shock_rat_file)
         self.agent = None
-        self.button = None
+
         # intvars for ints to show on screen
         self.reward_int = tk.IntVar()
         self.total_reward_int = tk.IntVar()
         self.episode_int = tk.IntVar()
         self.step_int = tk.IntVar()
+
+        # string vars for user defined variables
         self.sleep_var = tk.StringVar()
         self.sleep_var.set('0.3')
         self.epsilon_var = tk.StringVar()
@@ -110,6 +112,10 @@ class Canvas(tk.Frame):
         self.gamma_var.set('0.5')
         self.alpha_var = tk.StringVar()
         self.alpha_var.set('0.5')
+        self.episode_var = tk.StringVar()
+        self.episode_var.set('500')
+        self.lambda_var = tk.StringVar()
+        self.lambda_var.set('1')
 
         # 1 is variable, 2 is ratio
         self.lever_var = tk.IntVar()
@@ -192,6 +198,11 @@ class Canvas(tk.Frame):
         epsilon_entry = tk.Entry(variable_frame, textvariable=self.epsilon_var, justify="center", width=10)
         epsilon_entry.grid(row=2, column=2)
 
+        episode_label = tk.Label(variable_frame, text='Episodes: ', background='white')
+        episode_label.grid(row=3, column=1)
+        episode_entry = tk.Entry(variable_frame, textvariable=self.episode_var, justify='center', width=10)
+        episode_entry.grid(row=3, column=2)
+
         gamma_label = tk.Label(variable_frame, text="Gamma: ", background='white')
         gamma_label.grid(row=1, column=3)
         gamma_entry = tk.Entry(variable_frame, textvariable=self.gamma_var, justify='center', width=10)
@@ -201,7 +212,13 @@ class Canvas(tk.Frame):
         alpha_label.grid(row=2, column=3)
         alpha_entry = tk.Entry(variable_frame, textvariable=self.alpha_var, justify='center', width=10)
         alpha_entry.grid(row=2, column=4)
-        self.canvas.create_window(640, 50, window=variable_frame, anchor='center')
+
+        lambda_label = tk.Label(variable_frame, text='Lambda: ', background='white')
+        lambda_label.grid(row=3, column=3)
+        lambda_entry = tk.Entry(variable_frame, textvariable=self.lambda_var, justify='center', width=10)
+        lambda_entry.grid(row=3, column=4)
+
+        self.canvas.create_window(640, 60, window=variable_frame, anchor='center')
 
         algorithm_frame = tk.LabelFrame(self.canvas, text='Algorithms', labelanchor='n', background='white', pady=5)
         algorithm_frame.columnconfigure(1, weight=1)
@@ -221,7 +238,7 @@ class Canvas(tk.Frame):
                                      value=4)
         sarsa_radio.grid(row=2, column=2, sticky='W')
 
-        self.canvas.create_window(650, 140, window=algorithm_frame, anchor='center')
+        self.canvas.create_window(650, 160, window=algorithm_frame, anchor='center')
 
         lever_frame = tk.LabelFrame(self.canvas, text='Schedule of Reinforcement', labelanchor='n', background='white',
                                     pady=5, padx=5)
@@ -234,9 +251,7 @@ class Canvas(tk.Frame):
         ratio_label.grid(column=1, row=2, sticky='E')
         ratio_entry = tk.Entry(lever_frame, textvariable=self.lever_limit, width=10)
         ratio_entry.grid(column=2, row=2, sticky='W')
-        self.canvas.create_window(650, 240, window=lever_frame, anchor='center')
-
-
+        self.canvas.create_window(650, 260, window=lever_frame, anchor='center')
 
 
 def show_tkinter_q_table(grid):

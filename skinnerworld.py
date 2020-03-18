@@ -3,7 +3,6 @@ import numpy as np
 from random import randint
 import time
 
-
 class GridWorld(Canvas):
 
     def __init__(self, master):
@@ -11,11 +10,6 @@ class GridWorld(Canvas):
 
         self.master.bind('<KeyPress>', self.human_move_agent)
 
-        # buttons step button
-        # TODO figure out how many episodes should be run and set that as the max episodes or set
-        #  variable on gui for num episodes
-
-        # TODO add V value hide and change radio buttons
         run_frame = tk.LabelFrame(self.canvas, text='Start GridWorld', labelanchor='n', background='white',
                                   pady=5, padx=5)
         self.button = tk.Button(run_frame, text="One Episode",
@@ -23,7 +17,8 @@ class GridWorld(Canvas):
         self.button.configure(width=10, activebackground="#33B5E5")
         self.button.grid(row=1, column=1)
 
-        self.run_button = tk.Button(run_frame, text="Run", command=lambda: self.agent_control(episodes=15))
+        self.run_button = tk.Button(run_frame, text="Run", command=lambda: self.agent_control(
+            episodes=int(round(float(self.episode_var.get())))))
         self.run_button.configure(width=10, activebackground="#33B5E5")
         self.run_button.grid(row=1, column=2)
 
@@ -35,12 +30,24 @@ class GridWorld(Canvas):
         hide_q_value_radio.grid(row=2, column=2)
 
         show_v_value_radio = tk.Radiobutton(run_frame, text='Show V Values', variable=self.show_v_var,
-                                            background='white', value=1)
+                                            background='white', value=1, command=lambda: self.show_v_values())
         show_v_value_radio.grid(row=3, column=1)
         hide_v_value_radio = tk.Radiobutton(run_frame, text='Hide V Values', variable=self.show_v_var,
-                                            background='white', value=0)
+                                            background='white', value=0, command=lambda: self.show_v_values())
         hide_v_value_radio.grid(row=3, column=2)
-        self.canvas.create_window(650, 340, window=run_frame, anchor='center')
+        self.canvas.create_window(650, 370, window=run_frame, anchor='center')
+
+        end_frame = tk.LabelFrame(self.canvas, text='End GridWorld', labelanchor='n', background='white',
+                                  pady=5, padx=5)
+        self.reset_button = tk.Button(end_frame, text="Reset Agent",
+                                      command=lambda: self.restart_agent_button())
+        self.reset_button.configure(width=10, activebackground="#33B5E5")
+        self.reset_button.grid(row=1, column=1, sticky='E')
+
+        self.quit_button = tk.Button(end_frame, text='Quit', command=lambda: self.quit_gridworld_screen())
+        self.quit_button.configure(width=10, activebackground="#33B5E5")
+        self.quit_button.grid(row=1, column=2, sticky='W')
+        self.canvas.create_window(650, 470, window=end_frame, anchor='center')
 
         self.reward = 0
         self.total_reward = 0
@@ -58,7 +65,10 @@ class GridWorld(Canvas):
         self.episode_e = dict()
         self.episode_policy = []
         self.reward_list = []
+        self.step_togo_list = []
         self.episode_end = False
+        self.restart_agent = False
+        self.quit_gridworld = False
         self.lever_reward_step = None
         self.initialize_gridworld()
 
@@ -85,12 +95,22 @@ class GridWorld(Canvas):
         self.episode_policy = []
         self.reward_list = []
         self.episode_end = False
+        self.restart_agent = False
+        self.quit_gridworld = False
         self.set_lever_schedule()
+
+    def restart_agent_button(self):
+        self.restart_agent = True
+
+    def quit_gridworld_screen(self):
+        self.quit_gridworld = True
 
     def show_q_values(self):
         if self.show_q_var.get() > 0:
+            self.show_v_var.set(0)
+            self.canvas.delete('v')
             self.canvas.delete('q')
-            for cell in walk.grid.grid:
+            for cell in self.grid.grid:
                 for action in cell.actions:
                     if action == 'right':
                         x_coord = cell.x + 30
@@ -122,11 +142,13 @@ class GridWorld(Canvas):
 
     def show_v_values(self):
         if self.show_v_var.get() > 0:
+            self.show_q_var.set(0)
+            self.canvas.delete('q')
             self.canvas.delete('v')
             for cell in self.grid.grid:
                 if self.v_table[cell.x, cell.y] is not None:
                     self.canvas.create_text(cell.x, cell.y, text=np.round(self.v_table[(cell.x, cell.y)], 2),
-                                        font="Verdana 8", tag='v')
+                                            font="Verdana 8", tag='v')
         else:
             self.canvas.delete('v')
 
@@ -136,9 +158,8 @@ class GridWorld(Canvas):
             if s == (260, 460):
                 v = None
             else:
-                v = max(walk.q_table[s].values())
-            walk.v_table.update({s: v})
-
+                v = max(self.q_table[s].values())
+            self.v_table.update({s: v})
 
     def set_lever_schedule(self):
         if len(self.lever_limit.get()) > 0:
@@ -155,6 +176,7 @@ class GridWorld(Canvas):
 
     def setup_agent(self, sleep):
         self.show_q_values()
+        self.show_v_values()
         self.episode_end = False
         self.canvas.delete('agent')
         self.agent = self.canvas.create_image(60, 60, image=self.rat_image, tag='agent')
@@ -218,6 +240,7 @@ class GridWorld(Canvas):
             self.canvas.delete('cheese')
             self.increase_reward()
             self.episode_end = True
+            self.step_togo_list.append(self.step)
         else:
             self.lever_state.append(1)
             self.reward_list.append(0)
@@ -370,45 +393,73 @@ class GridWorld(Canvas):
         sleep = float(self.sleep_var.get())
         e = float(self.epsilon_var.get())
         while self.episode < episodes:
+            if self.restart_agent:
+                self.setup_agent(sleep=sleep)
+                self.initialize_gridworld()
+                break
+            elif self.quit_gridworld:
+                self.master.quit()
+                self.master.destroy()
+                break
+            else:
+                self.show_q_values()
+                self.v_values()
+                self.show_v_values()
+                current_state = self.agent_state.x, self.agent_state.y
+                ex = np.random.choice(['exploit', 'explore'], p=[1 - e, e])
+                if ex == 'exploit':
+                    max_action = max(self.q_table[current_state].values())
+                    action_selected = np.random.choice([k for (k, v) in self.q_table[current_state].items()
+                                                        if v == max_action])
+                else:
+                    actions = self.agent_state.actions
+                    action_selected = np.random.choice(actions)
+                if action_selected == 'lever':
+                    self.lever_press(sleep=sleep)
+                    if algorithm == 1:
+                        self.sample_average_q(action_selected)
+                    elif algorithm == 3:
+                        self.q_learning_prediction(action_selected)
+                    elif algorithm == 4:
+                        self.sarsa_prediction(action_selected)
+                    if self.episode_end:
+                        if algorithm == 2:
+                            self.monte_carlo_prediction()
+                        self.setup_agent(sleep=sleep)
+                else:
+                    self.move_action(action=action_selected, sleep=sleep)
+                    if algorithm == 1:
+                        self.sample_average_q(action_selected)
+                    elif algorithm == 3:
+                        self.q_learning_prediction(action_selected)
+                    elif algorithm == 4:
+                        self.sarsa_prediction(action_selected)
+        if self.quit_gridworld is not True:
+            self.v_values()
             self.show_q_values()
-            current_state = self.agent_state.x, self.agent_state.y
-            ex = np.random.choice(['exploit', 'explore'], p=[1 - e, e])
-            if ex == 'exploit':
-                max_action = max(self.q_table[current_state].values())
-                action_selected = np.random.choice([k for (k, v) in self.q_table[current_state].items()
-                                                    if v == max_action])
-            else:
-                actions = self.agent_state.actions
-                action_selected = np.random.choice(actions)
-            if action_selected == 'lever':
-                self.lever_press(sleep=sleep)
-                if algorithm == 1:
-                    self.sample_average_q(action_selected)
-                elif algorithm == 3:
-                    self.q_learning_prediction(action_selected)
-                elif algorithm == 4:
-                    self.sarsa_prediction(action_selected)
-                if self.episode_end:
-                    if algorithm == 2:
-                        self.monte_carlo_prediction()
-                    self.setup_agent(sleep=sleep)
-            else:
-                self.move_action(action=action_selected, sleep=sleep)
-                if algorithm == 1:
-                    self.sample_average_q(action_selected)
-                elif algorithm == 3:
-                    self.q_learning_prediction(action_selected)
-                elif algorithm == 4:
-                    self.sarsa_prediction(action_selected)
-        self.v_values()
-        if self.show_v_var.get() > 0:
-            self.show_q_var.set(0)
             self.show_v_values()
 
 
-app = tk.Tk()
-walk = GridWorld(app)
-walk.mainloop()
+class AgentData(object):
+    def __init__(self, gridworld, title):
+        self.title = title
+        self.q_table = gridworld.q_table
+        self.n_table = gridworld.n_table
+        self.v_table = gridworld.v_table
+        self.step_togo_list = gridworld.step_togo_list
+        self.algorithm = gridworld.algorithm_var.get()
+        self.episodes = gridworld.episode_var.get()
+        self.reward_list = gridworld.reward_list
+        if gridworld.lever_var.get() == 1:
+            self.lever = 'Variable'
+        else:
+            self.lever = 'Ratio'
+        self.lever_limit = gridworld.lever_limit.get()
+        if len(gridworld.lever_limit.get()) > 0:
+            self.lever_limit = int(round(float(self.lever_limit.get())))
+        elif self.lever == 'Variable':
+            self.lever_limit = 5
+        else:
+            self.lever_limit = 0
 
-#%%
-print(walk.v_table[160,460])
+
