@@ -82,7 +82,7 @@ class Canvas(tk.Frame):
     def __init__(self, master):
         self.master = master
         tk.Frame.__init__(self, master)
-        self.canvas = tk.Canvas(bg='white', height=600, width=770)
+        self.canvas = tk.Canvas(bg='white', height=600, width=790)
         rat_file = Image.open('images/rat.png')
         self.rat_image = ImageTk.PhotoImage(rat_file)
         shock_file = Image.open('images/shock.png')
@@ -116,6 +116,9 @@ class Canvas(tk.Frame):
         self.episode_var.set('500')
         self.lambda_var = tk.StringVar()
         self.lambda_var.set('1')
+
+        self.title_var = tk.StringVar()
+        self.title_var.set('Gridworld')
 
         # 1 is variable, 2 is ratio
         self.lever_var = tk.IntVar()
@@ -187,7 +190,7 @@ class Canvas(tk.Frame):
         self.canvas.create_window(290, 570, window=step_box)
 
         variable_frame = tk.LabelFrame(self.canvas, text='Variables', labelanchor='n', background='white', pady=5,
-                                       padx=5)
+                                       padx=1)
         sleep_label = tk.Label(variable_frame, text="Speed: ", background='white')
         sleep_label.grid(row=1, column=1)
         sleep_entry = tk.Entry(variable_frame, textvariable=self.sleep_var, justify="center", width=10)
@@ -218,7 +221,7 @@ class Canvas(tk.Frame):
         lambda_entry = tk.Entry(variable_frame, textvariable=self.lambda_var, justify='center', width=10)
         lambda_entry.grid(row=3, column=4)
 
-        self.canvas.create_window(640, 60, window=variable_frame, anchor='center')
+        self.canvas.create_window(650, 60, window=variable_frame, anchor='center')
 
         algorithm_frame = tk.LabelFrame(self.canvas, text='Algorithms', labelanchor='n', background='white', pady=5)
         algorithm_frame.columnconfigure(1, weight=1)
@@ -245,7 +248,7 @@ class Canvas(tk.Frame):
         variable_radio = tk.Radiobutton(lever_frame, text="Variable", variable=self.lever_var, background='white',
                                         value=1)
         variable_radio.grid(column=1, row=1, sticky='W')
-        ratio_radio = tk.Radiobutton(lever_frame, text="Ratio", variable=self.lever_var, background='white', value=2)
+        ratio_radio = tk.Radiobutton(lever_frame, text="Fixed", variable=self.lever_var, background='white', value=2)
         ratio_radio.grid(column=2, row=1, sticky='W')
         ratio_label = tk.Label(lever_frame, text="Limit: ", background='white')
         ratio_label.grid(column=1, row=2, sticky='E')

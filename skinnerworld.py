@@ -2,11 +2,16 @@ from GridworldSetup import *
 import numpy as np
 from random import randint
 import time
+import PIL.ImageGrab as ImageGrab
+import pickle
+
 
 class GridWorld(Canvas):
 
     def __init__(self, master):
         super().__init__(master)
+
+        self.master.title(self.title_var.get())
 
         self.master.bind('<KeyPress>', self.human_move_agent)
 
@@ -44,10 +49,24 @@ class GridWorld(Canvas):
         self.reset_button.configure(width=10, activebackground="#33B5E5")
         self.reset_button.grid(row=1, column=1, sticky='E')
 
-        self.quit_button = tk.Button(end_frame, text='Quit', command=lambda: self.quit_gridworld_screen())
+        self.quit_button = tk.Button(end_frame, text='Quit Training', command=lambda: self.quit_gridworld_screen())
         self.quit_button.configure(width=10, activebackground="#33B5E5")
         self.quit_button.grid(row=1, column=2, sticky='W')
-        self.canvas.create_window(650, 470, window=end_frame, anchor='center')
+
+        self.image_button = tk.Button(end_frame, text="Take Image", command=lambda: self.take_image())
+        self.image_button.configure(width=10, activebackground="#33B5E5")
+        self.image_button.grid(row=2, column=1, sticky='E')
+
+        self.save_data_button = tk.Button(end_frame, text="Save Data", command=lambda: self.save_data())
+        self.save_data_button.configure(width=10, activebackground="#33B5E5")
+        self.save_data_button.grid(row=2, column=2, sticky='W')
+
+        title_label = tk.Label(end_frame, text="Save Title: ", background='white')
+        title_label.grid(row=3, column=1, sticky='E')
+        title_entry = tk.Entry(end_frame, textvariable=self.title_var, justify='center', width=10)
+        title_entry.grid(row=3, column=2, sticky='W')
+
+        self.canvas.create_window(650, 500, window=end_frame, anchor='center')
 
         self.reward = 0
         self.total_reward = 0
@@ -104,6 +123,33 @@ class GridWorld(Canvas):
 
     def quit_gridworld_screen(self):
         self.quit_gridworld = True
+
+    def take_image(self):
+        self.canvas.delete('agent')
+        name = self.title_var.get()
+        self.show_q_var.set(1)
+        self.show_q_values()
+        self.master.update()
+        time.sleep(1)
+        self.save_canvas(savename=name + '_q')
+        self.show_v_var.set(1)
+        self.show_v_values()
+        self.master.update()
+        time.sleep(1)
+        self.save_canvas(savename=name + '_v')
+        self.agent = self.canvas.create_image(60, 60, image=self.rat_image, tag='agent')
+
+    def save_canvas(self, savename):
+        file = savename + '.png'
+        x = self.canvas.winfo_rootx() + 5
+        y = self.canvas.winfo_rooty() + 5
+        xx = x + 515
+        yy = y + 515
+        ImageGrab.grab(bbox=(x, y, xx, yy)).save(file)
+
+    def save_data(self):
+        data = AgentData(gridworld=self)
+        pickle.dump(data, open(data.title + '.pkl', 'wb'))
 
     def show_q_values(self):
         if self.show_q_var.get() > 0:
@@ -166,7 +212,7 @@ class GridWorld(Canvas):
             variable = int(round(float(self.lever_limit.get())))
             ratio = int(round(float(self.lever_limit.get())))
         else:
-            variable = 5
+            variable = 3
             ratio = 0
         if self.lever_var.get() == 1:
             step = randint(0, variable)
@@ -441,25 +487,28 @@ class GridWorld(Canvas):
 
 
 class AgentData(object):
-    def __init__(self, gridworld, title):
-        self.title = title
+    def __init__(self, gridworld):
+        self.title = gridworld.title_var.get()
         self.q_table = gridworld.q_table
         self.n_table = gridworld.n_table
         self.v_table = gridworld.v_table
         self.step_togo_list = gridworld.step_togo_list
-        self.algorithm = gridworld.algorithm_var.get()
+        if gridworld.algorithm_var.get() == 1:
+            self.algorithm = 'Sample Average Q'
+        elif gridworld.algorithm_var.get() == 2:
+            self.algorithm = 'Monte Carlo'
+        elif gridworld.algorithm_var.get() == 3:
+            self.algorithm = 'Q Learning'
+        else:
+            self.algorithm = 'SARSA'
         self.episodes = gridworld.episode_var.get()
-        self.reward_list = gridworld.reward_list
+        self.total_reward = gridworld.total_reward
+        self.e = gridworld.epsilon_var.get()
+        self.gamma = gridworld.gamma_var.get()
+        self.alpha = gridworld.alpha_var.get()
+        self.lam = gridworld.lambda_var.get()
         if gridworld.lever_var.get() == 1:
             self.lever = 'Variable'
         else:
             self.lever = 'Ratio'
-        self.lever_limit = gridworld.lever_limit.get()
-        if len(gridworld.lever_limit.get()) > 0:
-            self.lever_limit = int(round(float(self.lever_limit.get())))
-        elif self.lever == 'Variable':
-            self.lever_limit = 5
-        else:
-            self.lever_limit = 0
-
-
+        self.lever_reward_limit = gridworld.lever_reward_step
