@@ -3,37 +3,66 @@ from PIL import Image, ImageTk
 import pandas as pd
 
 
-# TODO add function and class definitions to everything
+
 
 class Cell(object):
+    """
+    Class to generate cell parameters for each cell in the gridworld
+    x and y represent the middle coordinates of each cell
+    actions are a list of possible actions alloted to the agent in that cell
+    reward is the corresponding reward for entering the cell
+    changeagent is a boolean field to represent if the agent's image will change when the agent enters the cell
+
+    """
     def __init__(self, x, y, actions, reward=0, changeagent=False):
         self.x = x
         self.y = y
         self.actions = actions
         self.reward = reward
         self.changeagent = changeagent
+        # dictionaries to hold q values, n values episode discounted return and total discounted return
         self.q = dict()
+        self.n = dict()
+        self.total_g = dict()
+        self.episode_g = dict()
+        # eligiblity trace dictionary for SARSA
+        self.episode_e = dict()
+        # v value for the cell
+        self.v = 0
+        self.reset_all_values(actions)
+
+    def reset_all_values(self, actions):
+        """
+        Function to reset all values of the cell
+        Used in training to restart the gridworld
+        :param actions: list of actions for the cell
+        :return: cell attributes are reset to 0
+        """
         for action in actions:
             self.q[action] = 0
-        self.v = 0
-        self.n = dict()
-        for action in actions:
             self.n[action] = 0
-        self.total_g = dict()
-        for action in actions:
             self.total_g[action] = []
-        self.episode_g = None
+            self.v = 0
         self.reset_episode_g(actions)
-        self.episode_e = None
         self.reset_episode_e(actions)
 
     def reset_episode_g(self, actions):
-        self.episode_g = dict()
+        """
+        Function to reset episode discounted return for the cell state
+        used in training to reset episode G at the start of each episode
+        :param actions: list of actions for the cell
+        :return: cell episode_g is reset to 0
+        """
         for action in actions:
             self.episode_g[action] = 0
 
     def reset_episode_e(self, actions):
-        self.episode_e = dict()
+        """
+        reset the episode eligibilty trace for the cell state
+        used in training to restart e values at the start of each episode
+        :param actions: list of actions for the cell
+        :return: episode_e is reset to 0
+        """
         for action in actions:
             self.episode_e[action] = 0
 
@@ -41,6 +70,9 @@ class Cell(object):
 class StateGrid(object):
     """
     Class to hold cell objects
+    each cell is generated here by calling the Cell class
+    Creates a list of cells in the grid
+
     """
 
     def __init__(self):
@@ -79,10 +111,17 @@ class StateGrid(object):
 
 
 class Canvas(tk.Frame):
+    """
+    Class to store the Canvas items that are shown on the screen
+    Inheirits the Tkinter GUI frame as master
+
+    """
     def __init__(self, master):
         self.master = master
         tk.Frame.__init__(self, master)
+        # create a canvas
         self.canvas = tk.Canvas(bg='white', height=600, width=790)
+        # adds the files for the images used on screen
         rat_file = Image.open('images/rat.png')
         self.rat_image = ImageTk.PhotoImage(rat_file)
         shock_file = Image.open('images/shock.png')
@@ -95,6 +134,7 @@ class Canvas(tk.Frame):
         self.cheese_image = ImageTk.PhotoImage(cheese_file)
         shock_rat_file = Image.open('images/shock_rat.png')
         self.shock_rat_image = ImageTk.PhotoImage(shock_rat_file)
+        # creates the agent
         self.agent = None
 
         # intvars for ints to show on screen
@@ -104,32 +144,37 @@ class Canvas(tk.Frame):
         self.step_int = tk.IntVar()
 
         # string vars for user defined variables
+        # default values are set if no parameters are set prior to launching the GUI
         self.sleep_var = tk.StringVar()
         self.sleep_var.set('0.3')
         self.epsilon_var = tk.StringVar()
         self.epsilon_var.set('0.1')
         self.gamma_var = tk.StringVar()
-        self.gamma_var.set('0.5')
+        self.gamma_var.set('0.9')
         self.alpha_var = tk.StringVar()
         self.alpha_var.set('0.5')
         self.episode_var = tk.StringVar()
         self.episode_var.set('500')
         self.lambda_var = tk.StringVar()
-        self.lambda_var.set('1')
+        self.lambda_var.set('0.5')
 
         self.title_var = tk.StringVar()
-        self.title_var.set('Gridworld')
+        self.title_var.set('SkinnerWorld')
 
-        # 1 is variable, 2 is ratio
+        # variable to set lever schedule as variable or fixed
+        # 1 is variable, 2 is fixed
         self.lever_var = tk.IntVar()
         self.lever_var.set(2)
 
+        # variable to set the lever limit, no defualt is needed, if none is added, defaults to 0 (i.e. 1)
         self.lever_limit = tk.StringVar()
 
+        # variable to set the algorithm
         # 1 is sample average q, 2 is monte carlo, 3 is Q learning, 4 is SARSA
         self.algorithm_var = tk.IntVar()
         self.algorithm_var.set(1)
 
+        # variables to show or hide q and v values on the screen
         # 1 is show, 0 is hide
         self.show_q_var = tk.IntVar()
         self.show_q_var.set(0)
@@ -147,6 +192,10 @@ class Canvas(tk.Frame):
         self.canvas.pack()
 
     def create_images(self):
+        """
+        Creates images on the screen
+        :return:
+        """
         self.canvas.create_image(60, 460, image=self.shock_image)
         self.canvas.create_image(160, 260, image=self.shock_image)
         self.canvas.create_image(360, 160, image=self.shock_image)
@@ -154,6 +203,12 @@ class Canvas(tk.Frame):
         self.agent = self.canvas.create_image(60, 60, image=self.rat_image, tag='agent')
 
     def setup_grid(self, w=510, h=510):
+        """
+        Sets up the grid for the GUI
+        :param w: width of grid
+        :param h: height of grid
+        :return:
+        """
         # Creates all vertical lines at intevals of 100
         for i in range(10, w, 100):
             self.canvas.create_line([(i, 10), (i, h)], tag='grid_line')
@@ -166,6 +221,10 @@ class Canvas(tk.Frame):
         self.canvas.create_line(10, h, w, h)
 
     def setup_canvas_items(self):
+        """
+        Sets up canvas items such as text, boxes to display variables
+        :return:
+        """
         # reward label and int to display
         reward_label = self.canvas.create_text(50, 540)
         self.canvas.itemconfig(reward_label, text="Episode Reward: ")
@@ -189,6 +248,7 @@ class Canvas(tk.Frame):
         step_box = tk.Entry(textvariable=str(self.step_int), justify="center", width=10)
         self.canvas.create_window(290, 570, window=step_box)
 
+        # variables on screen
         variable_frame = tk.LabelFrame(self.canvas, text='Variables', labelanchor='n', background='white', pady=5,
                                        padx=1)
         sleep_label = tk.Label(variable_frame, text="Speed: ", background='white')
@@ -223,6 +283,7 @@ class Canvas(tk.Frame):
 
         self.canvas.create_window(650, 60, window=variable_frame, anchor='center')
 
+        # algorithms to choose from
         algorithm_frame = tk.LabelFrame(self.canvas, text='Algorithms', labelanchor='n', background='white', pady=5)
         algorithm_frame.columnconfigure(1, weight=1)
         algorithm_frame.columnconfigure(2, weight=1)
@@ -243,6 +304,7 @@ class Canvas(tk.Frame):
 
         self.canvas.create_window(650, 160, window=algorithm_frame, anchor='center')
 
+        # variables for schedules of reinforcement
         lever_frame = tk.LabelFrame(self.canvas, text='Schedule of Reinforcement', labelanchor='n', background='white',
                                     pady=5, padx=5)
         variable_radio = tk.Radiobutton(lever_frame, text="Variable", variable=self.lever_var, background='white',
@@ -258,7 +320,11 @@ class Canvas(tk.Frame):
 
 
 def show_tkinter_q_table(grid):
-    # TODO make a way to save results after running gridworld
+    """
+    Function to show the learned q table after training, not used at all.
+    :param grid: gridworld class after training
+    :return:
+    """
     q = grid.q_table
     df = pd.DataFrame(q)
     df = df.reset_index()
