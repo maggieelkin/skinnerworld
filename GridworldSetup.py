@@ -319,26 +319,5 @@ class Canvas(tk.Frame):
         self.canvas.create_window(650, 260, window=lever_frame, anchor='center')
 
 
-def show_tkinter_q_table(grid):
-    """
-    Function to show the learned q table after training, not used at all.
-    :param grid: gridworld class after training
-    :return:
-    """
-    q = grid.q_table
-    df = pd.DataFrame(q)
-    df = df.reset_index()
-    root = tk.Tk()
-    i = 0
-    c = 0
-    for x in df.columns.to_list():
-        tk.Label(root, text=x).grid(row=i, column=c)
-        c = c + 1
-    for i, row in df.iterrows():
-        c = 0
-        for cell in row:
-            tk.Label(root, text=cell).grid(row=i + 1, column=c)
-            c = c + 1
-    root.mainloop()
 
 
