@@ -30,9 +30,9 @@ def show_data(d):
         if d[data].lever == 'Ratio' and d[data].lever_reward_limit == 0:
             schedule = 'FR-1'
         elif d[data].lever == 'Ratio':
-            schedule = 'FR-'+str(d[data].lever_reward_limit)
+            schedule = 'FR-' + str(d[data].lever_reward_limit)
         else:
-            schedule = 'VR-'+str(d[data].lever_reward_limit)
+            schedule = 'VR-' + str(d[data].lever_reward_limit)
         df1 = pd.DataFrame({'Algorithm': d[data].algorithm,
                             'Lever': d[data].lever,
                             'Lever Limit': d[data].lever_reward_limit,
@@ -49,3 +49,32 @@ def show_data(d):
         df = df.append(df1)
     return df
 
+
+def get_average_q_table(data):
+    """
+    Function to average all q_tables in a dictonairy that holds AgentData
+    :param data: dictionary of AgentData Objects
+    :type data: dict
+    :return: Averaged Q table dictionary
+    :rtype: dict
+    """
+    tables = []
+    for key in data.keys():
+        tables.append(data[key].q_table)
+    n = len(tables)
+    avg_q_table = {}
+    for q_table in tables:
+        for state in q_table.keys():
+            for action, q in q_table[state].items():
+                if not state in avg_q_table.keys():
+                    avg_q_table[state] = {action: q}
+                else:
+                    if not action in avg_q_table[state].keys():
+                        avg_q_table[state].update({action: q})
+                    else:
+                        avg_q_table[state].update({action: avg_q_table[state][action] + q})
+    for state in avg_q_table.keys():
+        for action, q in avg_q_table[state].items():
+            avg_q = q / n
+            avg_q_table[state].update({action: avg_q})
+    return avg_q_table
