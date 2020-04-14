@@ -26,7 +26,7 @@ class GridWorld(Canvas):
         self.master.title(self.title_var.get())
 
         # function to move agent on screen with key presses, used in testing to see if everything worked
-        self.master.bind('<KeyPress>', self.human_move_agent)
+        #self.master.bind('<KeyPress>', self.human_move_agent)
 
         # extra frames on grid that need to be in this class because buttons are mapped to functions for Gridworld Class
         # start gridworld has run buttons and episode buttons

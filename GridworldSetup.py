@@ -1,8 +1,5 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-import pandas as pd
-
-
 
 
 class Cell(object):
@@ -317,7 +314,3 @@ class Canvas(tk.Frame):
         ratio_entry = tk.Entry(lever_frame, textvariable=self.lever_limit, width=10)
         ratio_entry.grid(column=2, row=2, sticky='W')
         self.canvas.create_window(650, 260, window=lever_frame, anchor='center')
-
-
-
-
