@@ -37,6 +37,8 @@ Variable schedules will pick a random number between 1 and the limit specified, 
 main.py demonstrates the main driver for SkinnerWorld.
 
 autorun_skinnerworld.py demonstrates how variables can be preset and run through an autoloop. 
+
+
 ![AutoRun SkinnerWorld Demo](demo/skinnerworld_fast.gif)
 
 The "Save Data" button will create and pickle the AgentData class that will store the Q and V tables and selected variables for later analysis.
@@ -51,6 +53,6 @@ The "Take Image" button will generate and save screenshots of the Q table and V 
 
 ## Authors
 
-* **Maggie Elkin** 
+* **Magdalyn Elkin** 
 
 
